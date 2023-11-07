@@ -185,6 +185,7 @@ properties:
             * Not formatted as a UUID
             * Complies with RFC 1034 (https://datatracker.ietf.org/doc/html/rfc1034) (section 3.5)
         required: true
+
       - !ruby/object:Api::Type::Map
         name: 'nodeTypeConfigs'
         description: |
@@ -304,4 +305,4 @@ properties:
     values:
       - :STANDARD
       - :TIME_LIMITED
-    default_from_api: true
+    default_value: :STANDARD
