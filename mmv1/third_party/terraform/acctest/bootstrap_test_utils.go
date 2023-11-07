@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/terraform-provider-google/google/services/resourcemanager"
 	tpgservicenetworking "github.com/hashicorp/terraform-provider-google/google/services/servicenetworking"
 	"github.com/hashicorp/terraform-provider-google/google/services/sql"
+	"github.com/hashicorp/terraform-provider-google/google/services/vmwareengine"
 	"github.com/hashicorp/terraform-provider-google/google/tpgiamresource"
 	"github.com/hashicorp/terraform-provider-google/google/tpgresource"
 	transport_tpg "github.com/hashicorp/terraform-provider-google/google/transport"
@@ -932,6 +933,153 @@ func BootstrapSharedCaPoolInLocation(t *testing.T, location string) string {
 		}
 	}
 	return poolName
+}
+func BootstrapVmwareengineNetwork(t *testing.T, networkName string) string {
+	project := envvar.GetTestProjectFromEnv()
+
+	config := BootstrapConfig(t)
+	if config == nil {
+		return ""
+	}
+	log.Printf("[DEBUG] Getting Vmware Engine Network %q", networkName)
+	url := fmt.Sprintf("%sprojects/%s/locations/global/vmwareEngineNetworks/%s", config.VmwareengineBasePath, project, networkName)
+	_, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+		Config:               config,
+		Method:               "GET",
+		Project:              project,
+		RawURL:               url,
+		UserAgent:            config.UserAgent,
+		ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+	})
+	if err != nil {
+		log.Printf("[DEBUG] Vmware Engine Network %q not found, bootstrapping", networkName)
+		networkObj := map[string]interface{}{
+			"location": "global",
+			"type":     "STANDARD",
+		}
+		networkCreateUrl := fmt.Sprintf("%sprojects/%s/locations/global/vmwareEngineNetworks?vmwareEngineNetworkId=%s", config.VmwareengineBasePath, project, networkName)
+		networkRes, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+			Config:               config,
+			Method:               "POST",
+			Project:              project,
+			RawURL:               networkCreateUrl,
+			UserAgent:            config.UserAgent,
+			Body:                 networkObj,
+			Timeout:              20 * time.Minute,
+			ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+		})
+		if err != nil {
+			t.Fatalf("Error bootstrapping Vmware Engine Network %q: %s", networkName, err)
+		}
+
+		log.Printf("[DEBUG] Waiting for Vmware Engine Network creation to finish")
+		err = vmwareengine.VmwareengineOperationWaitTime(
+			config, networkRes, project, "Creating Vmware Engine Network", config.UserAgent,
+			20*time.Minute)
+		if err != nil {
+			t.Errorf("Error getting Vmware Engine Network %q: %s", networkName, err)
+		}
+
+		_, err = transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+			Config:               config,
+			Method:               "GET",
+			Project:              project,
+			RawURL:               url,
+			UserAgent:            config.UserAgent,
+			ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+		})
+		if err != nil {
+			t.Errorf("Error getting shared Vmware Engine Network %q: %s", networkName, err)
+		}
+	}
+
+	networkId := fmt.Sprintf("projects/%s/locations/global/vmwareEngineNetworks/%s", project, networkName)
+	return networkId
+}
+
+func BootstrapVmwareenginePrivateCloud(t *testing.T, privateCloudName string, networkName string, timeLimited bool) string {
+	project := envvar.GetTestProjectFromEnv()
+	region := envvar.GetTestRegionFromEnv()
+	config := BootstrapConfig(t)
+	if config == nil {
+		return ""
+	}
+
+	log.Printf("[DEBUG] Getting Private Cloud %q", privateCloudName)
+	url := fmt.Sprintf("%sprojects/%s/locations/%s-a/privateClouds/%s", config.VmwareengineBasePath, project, region, privateCloudName)
+	_, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+		Config:               config,
+		Method:               "GET",
+		Project:              project,
+		RawURL:               url,
+		UserAgent:            config.UserAgent,
+		ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+	})
+	if err != nil {
+		log.Printf("[DEBUG] Private cloud %q not found, bootstrapping", privateCloudName)
+		pcType := "STANDARD"
+		nodeCount := 3
+		managementCidr := "192.168.30.0/24"
+		if timeLimited {
+			pcType = "TIME_LIMITED"
+			nodeCount = 1
+			managementCidr = "192.168.10.0/24"
+		}
+		networkConfigObj := map[string]interface{}{
+			"management_cidr":       managementCidr,
+			"vmware_engine_network": networkName,
+		}
+		nodeTypeConfig := map[string]interface{}{
+			"node_type_id": "standard-72",
+			"node_count":   nodeCount,
+		}
+		managementClusterObj := map[string]interface{}{
+			"cluster_id":        "tf-test-sample-mgmt-cluster",
+			"node_type_configs": nodeTypeConfig,
+		}
+		obj := map[string]interface{}{
+			"type":               pcType,
+			"location":           "southamerica-west1-a",
+			"network_config":     networkConfigObj,
+			"management_cluster": managementClusterObj,
+		}
+		createUrl := fmt.Sprintf("%sprojects/%s/locations/%s-a/privateClouds?privateCloudId=%s", config.VmwareengineBasePath, project, region, privateCloudName)
+		res, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+			Config:               config,
+			Method:               "POST",
+			Project:              project,
+			RawURL:               createUrl,
+			UserAgent:            config.UserAgent,
+			Body:                 obj,
+			Timeout:              180 * time.Minute,
+			ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+		})
+		if err != nil {
+			t.Fatalf("Error bootstrapping private cloud %q: %s", privateCloudName, err)
+		}
+
+		log.Printf("[DEBUG] Waiting for private cloud creation to finish")
+		err = vmwareengine.VmwareengineOperationWaitTime(
+			config, res, project, "Creating Private Cloud", config.UserAgent,
+			180*time.Minute)
+		if err != nil {
+			t.Errorf("Error getting shared PrivateCloud %q: %s", privateCloudName, err)
+		}
+		_, err = transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+			Config:               config,
+			Method:               "GET",
+			Project:              project,
+			RawURL:               url,
+			UserAgent:            config.UserAgent,
+			ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+		})
+		if err != nil {
+			t.Errorf("Error getting shared Private Cloud %q: %s", privateCloudName, err)
+		}
+	}
+
+	privateCloudId := fmt.Sprintf("projects/%s/locations/%s-a/privateClouds/%s", project, region, privateCloudName)
+	return privateCloudId
 }
 
 func BootstrapSubnet(t *testing.T, subnetName string, networkName string) string {
