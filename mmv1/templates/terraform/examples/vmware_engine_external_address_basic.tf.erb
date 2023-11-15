@@ -1,0 +1,6 @@
+resource "google_vmwareengine_external_address" "<%= ctx[:primary_resource_id] %>" {
+    name = "<%= ctx[:vars]['name'] %>"
+    parent =  "<%= ctx[:vars]['private_cloud_id'] %>"
+    internal_ip = "192.168.0.66"
+    description = "Sample description."
+}

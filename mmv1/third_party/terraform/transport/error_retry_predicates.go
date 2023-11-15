@@ -507,3 +507,12 @@ func IsForbiddenIamServiceAccountRetryableError(opType string) RetryErrorPredica
 		return false, ""
 	}
 }
+
+func ExternalIpServiceNotActive(err error) (bool, string) {
+	if gerr, ok := err.(*googleapi.Error); ok {
+		if gerr.Code == 400 && strings.Contains(gerr.Body, "External IP address network service is not active in the provided network policy") {
+			return true, "Waiting for external ip service to be enabled"
+		}
+	}
+	return false, ""
+}

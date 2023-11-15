@@ -46,8 +46,8 @@ func TestAccVmwareengineNetworkPolicy_update(t *testing.T) {
 
 func testAccVmwareengineNetworkPolicy_config(context map[string]interface{}, internetAccess bool, externalIp bool) string {
 	context["internet_access"] = internetAccess
-	context["external_ip"] = externalIp	
-	
+	context["external_ip"] = externalIp
+
 	return acctest.Nprintf(`
 resource "google_vmwareengine_network" "network-policy-nw" {
     name              = "tf-test-sample-nw%{random_suffix}"

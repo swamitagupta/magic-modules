@@ -954,8 +954,7 @@ func BootstrapVmwareengineNetwork(t *testing.T, networkName string) string {
 	if err != nil {
 		log.Printf("[DEBUG] Vmware Engine Network %q not found, bootstrapping", networkName)
 		networkObj := map[string]interface{}{
-			"location": "global",
-			"type":     "STANDARD",
+			"type": "STANDARD",
 		}
 		networkCreateUrl := fmt.Sprintf("%sprojects/%s/locations/global/vmwareEngineNetworks?vmwareEngineNetworkId=%s", config.VmwareengineBasePath, project, networkName)
 		networkRes, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
@@ -1030,16 +1029,17 @@ func BootstrapVmwareenginePrivateCloud(t *testing.T, privateCloudName string, ne
 			"vmware_engine_network": networkName,
 		}
 		nodeTypeConfig := map[string]interface{}{
-			"node_type_id": "standard-72",
-			"node_count":   nodeCount,
+			"node_count": nodeCount,
+		}
+		nodeType := map[string]interface{}{
+			"standard-72": nodeTypeConfig,
 		}
 		managementClusterObj := map[string]interface{}{
 			"cluster_id":        "tf-test-sample-mgmt-cluster",
-			"node_type_configs": nodeTypeConfig,
+			"node_type_configs": nodeType,
 		}
 		obj := map[string]interface{}{
 			"type":               pcType,
-			"location":           "southamerica-west1-a",
 			"network_config":     networkConfigObj,
 			"management_cluster": managementClusterObj,
 		}
@@ -1079,6 +1079,79 @@ func BootstrapVmwareenginePrivateCloud(t *testing.T, privateCloudName string, ne
 	}
 
 	privateCloudId := fmt.Sprintf("projects/%s/locations/%s-a/privateClouds/%s", project, region, privateCloudName)
+	return privateCloudId
+}
+
+func BootstrapVmwareengineNetworkPolicy(t *testing.T, networkPolicyName string, networkName string) string {
+	project := envvar.GetTestProjectFromEnv()
+	region := envvar.GetTestRegionFromEnv()
+
+	config := BootstrapConfig(t)
+	if config == nil {
+		return ""
+	}
+
+	log.Printf("[DEBUG] Getting Network Policy %q", networkPolicyName)
+	url := fmt.Sprintf("%sprojects/%s/locations/%s/networkPolicies/%s", config.VmwareengineBasePath, project, region, networkPolicyName)
+	_, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+		Config:               config,
+		Method:               "GET",
+		Project:              project,
+		RawURL:               url,
+		UserAgent:            config.UserAgent,
+		ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+	})
+	if err != nil {
+		log.Printf("[DEBUG] Network Policy %q not found, bootstrapping", networkPolicyName)
+
+		internetAccessObj := map[string]interface{}{
+			"enabled": true,
+		}
+		externalIpObj := map[string]interface{}{
+			"enabled": true,
+		}
+		obj := map[string]interface{}{
+			"internet_access":       internetAccessObj,
+			"external_ip":           externalIpObj,
+			"edge_services_cidr":    "192.168.0.0/26",
+			"vmware_engine_network": networkName,
+		}
+		createUrl := fmt.Sprintf("%sprojects/%s/locations/%s/networkPolicies?networkPolicyId=%s", config.VmwareengineBasePath, project, region, networkPolicyName)
+		res, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+			Config:               config,
+			Method:               "POST",
+			Project:              project,
+			RawURL:               createUrl,
+			UserAgent:            config.UserAgent,
+			Body:                 obj,
+			Timeout:              180 * time.Minute,
+			ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+		})
+		if err != nil {
+			t.Fatalf("Error bootstrapping Network Policy %q: %s", networkPolicyName, err)
+		}
+
+		log.Printf("[DEBUG] Waiting for Network Policy creation to finish")
+		err = vmwareengine.VmwareengineOperationWaitTime(
+			config, res, project, "Creating Network Policy", config.UserAgent,
+			180*time.Minute)
+		if err != nil {
+			t.Errorf("Error getting shared Network Policy %q: %s", networkPolicyName, err)
+		}
+		_, err = transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+			Config:               config,
+			Method:               "GET",
+			Project:              project,
+			RawURL:               url,
+			UserAgent:            config.UserAgent,
+			ErrorAbortPredicates: []transport_tpg.RetryErrorPredicateFunc{transport_tpg.Is429QuotaError},
+		})
+		if err != nil {
+			t.Errorf("Error getting shared Network Policy %q: %s", networkPolicyName, err)
+		}
+	}
+
+	privateCloudId := fmt.Sprintf("projects/%s/locations/%s/networkPolicies/%s", project, region, networkPolicyName)
 	return privateCloudId
 }
 
