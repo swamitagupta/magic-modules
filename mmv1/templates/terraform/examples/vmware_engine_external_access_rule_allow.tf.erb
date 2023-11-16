@@ -1,0 +1,22 @@
+resource "google_vmwareengine_external_address" "external-access-rule-ea" {
+    name = "<%= ctx[:vars]['external_address_id'] %>"
+    parent =  "<%= ctx[:vars]['private_cloud_id'] %>"
+    internal_ip = "192.168.0.70"
+    description = "Sample description."
+}
+resource "google_vmwareengine_external_access_rule" "<%= ctx[:primary_resource_id] %>" {
+    name = "<%= ctx[:vars]['name'] %>"
+    parent =  "<%= ctx[:vars]['network_policy_id'] %>"
+    description = "Sample Description"
+    priority = 101
+    action = "ALLOW"
+    ip_protocol = "tcp"
+    source_ip_ranges {
+        ip_address = "192.168.50.0"
+    }
+    source_ports = ["80"]
+    destination_ip_ranges {
+        external_address = google_vmwareengine_external_address.external-access-rule-ea.id
+    }
+    destination_ports = ["433"]
+}
