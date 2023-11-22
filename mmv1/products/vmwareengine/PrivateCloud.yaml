@@ -305,4 +305,4 @@ properties:
     values:
       - :STANDARD
       - :TIME_LIMITED
-    default_value: :STANDARD
+    default_from_api: true
