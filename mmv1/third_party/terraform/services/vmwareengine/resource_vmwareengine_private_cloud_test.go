@@ -101,6 +101,68 @@ data "google_vmwareengine_private_cloud" ds {
 `, context)
 }
 
+func TestAccVmwareenginePrivateCloud_vmwareEnginePrivateCloudTimeLimitedUpdate(t *testing.T) {
+	t.Parallel()
+	context := map[string]interface{}{
+		"region":        "southamerica-west1", // using region with low node utilization.
+		"random_suffix": acctest.RandString(t, 10),
+	}
+	acctest.VcrTest(t, resource.TestCase{
+		PreCheck:                 func() { acctest.AccTestPreCheck(t) },
+		ProtoV5ProviderFactories: acctest.ProtoV5ProviderFactories(t),
+		CheckDestroy:             testAccCheckVmwareenginePrivateCloudDestroyProducer(t),
+		Steps: []resource.TestStep{
+			{
+				Config: testPrivateCloudTimeLimitedUpdate(context, "description1"),
+			},
+			{
+				ResourceName:            "google_vmwareengine_private_cloud.vmw-engine-pc",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"location", "name"},
+			},
+			{
+				Config: testPrivateCloudTimeLimitedUpdate(context, "description2"),
+			},
+			{
+				ResourceName:            "google_vmwareengine_private_cloud.vmw-engine-pc",
+				ImportState:             true,
+				ImportStateVerify:       true,
+				ImportStateVerifyIgnore: []string{"location", "name"},
+			},
+		},
+	})
+}
+
+func testPrivateCloudTimeLimitedUpdate(context map[string]interface{}, description string) string {
+	context["description"] = description
+	return acctest.Nprintf(`
+	resource "google_vmwareengine_network" "default-time-limited-nw" {
+	   name              = "tf-test-nw%{random_suffix}"
+	   location          = "global"
+	   type              = "STANDARD"
+	}
+
+	resource "google_vmwareengine_private_cloud" "vmw-engine-pc" {
+	  location = "%{region}-a"
+	  name = "tf-test-time-limited-pc%{random_suffix}"
+	  description = "%{description}"
+	  type="TIME_LIMITED"
+	  network_config {
+		management_cidr = "192.168.10.0/24"
+		vmware_engine_network = google_vmwareengine_network.default-time-limited-nw.id
+	  }
+	  management_cluster {
+		cluster_id = "tf-test-sample-mgmt-cluster-custom-core-count%{random_suffix}"
+		node_type_configs {
+		  node_type_id = "standard-72"
+		  node_count = "1"
+		}
+	  }
+	}
+	`, context)
+}
+
 func testAccCheckVmwareenginePrivateCloudDestroyProducer(t *testing.T) func(s *terraform.State) error {
 	return func(s *terraform.State) error {
 		for name, rs := range s.RootModule().Resources {
