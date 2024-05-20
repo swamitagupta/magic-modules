@@ -16,6 +16,7 @@ resource "google_vmwareengine_private_cloud" "<%= ctx[:primary_resource_id] %>" 
       custom_core_count = 32
     }
   }
+  deletion_delay_hours = 4
 }
 
 resource "google_vmwareengine_network" "pc-nw" {

@@ -15,7 +15,7 @@
 name: 'PrivateCloud'
 base_url: 'projects/{{project}}/locations/{{location}}/privateClouds'
 self_link: 'projects/{{project}}/locations/{{location}}/privateClouds/{{name}}'
-delete_url: 'projects/{{project}}/locations/{{location}}/privateClouds/{{name}}?delay_hours=0'
+delete_url: 'projects/{{project}}/locations/{{location}}/privateClouds/{{name}}?delay_hours={{deletionDelayHours}}'
 create_url: 'projects/{{project}}/locations/{{location}}/privateClouds?privateCloudId={{name}}'
 update_verb: :PATCH
 references: !ruby/object:Api::Resource::ReferenceLinks
@@ -89,6 +89,12 @@ parameters:
     url_param_only: true
     description: |
       The ID of the PrivateCloud.
+ - !ruby/object:Api::Type::String
+    name: "deletionDelayHours"
+    url_param_only: true
+    default_value: 3
+    description: |
+      The number of hours to delay this request; the default is 3. You can set an hour between 0 to 8. Setting this value to 0 starts the deletion request immediately.
 
 properties:
   - !ruby/object:Api::Type::String

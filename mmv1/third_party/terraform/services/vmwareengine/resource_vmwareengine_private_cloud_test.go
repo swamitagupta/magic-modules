@@ -18,7 +18,7 @@ func TestAccVmwareenginePrivateCloud_vmwareEnginePrivateCloudUpdate(t *testing.T
 	t.Parallel()
 
 	context := map[string]interface{}{
-		"region":          "southamerica-west1",
+		"region":          "me-west1",
 		"random_suffix":   acctest.RandString(t, 10),
 		"org_id":          envvar.GetTestOrgFromEnv(t),
 		"billing_account": envvar.GetTestBillingAccountFromEnv(t),
@@ -33,7 +33,7 @@ func TestAccVmwareenginePrivateCloud_vmwareEnginePrivateCloudUpdate(t *testing.T
 		CheckDestroy: testAccCheckVmwareenginePrivateCloudDestroyProducer(t),
 		Steps: []resource.TestStep{
 			{
-				Config: testPrivateCloudUpdateConfig(context, "description1", 1),
+				Config: testPrivateCloudUpdateConfig(context, "description1", 1, 3),
 				Check: resource.ComposeTestCheckFunc(
 					acctest.CheckDataSourceStateMatchesResourceStateWithIgnores("data.google_vmwareengine_private_cloud.ds", "google_vmwareengine_private_cloud.vmw-engine-pc", map[string]struct{}{"type": {}}),
 					testAccCheckGoogleVmwareengineNsxCredentialsMeta("data.google_vmwareengine_nsx_credentials.nsx-ds"),
@@ -47,7 +47,7 @@ func TestAccVmwareenginePrivateCloud_vmwareEnginePrivateCloudUpdate(t *testing.T
 				ImportStateVerifyIgnore: []string{"location", "name", "update_time", "type"},
 			},
 			{
-				Config: testPrivateCloudUpdateConfig(context, "description2", 4), // Expand PC
+				Config: testPrivateCloudUpdateConfig(context, "description2", 4, 8), // Expand PC
 			},
 			{
 				ResourceName:            "google_vmwareengine_private_cloud.vmw-engine-pc",
@@ -56,7 +56,7 @@ func TestAccVmwareenginePrivateCloud_vmwareEnginePrivateCloudUpdate(t *testing.T
 				ImportStateVerifyIgnore: []string{"location", "name", "update_time", "type"},
 			},
 			{
-				Config: testPrivateCloudUpdateConfig(context, "description2", 3), // Shrink PC
+				Config: testPrivateCloudUpdateConfig(context, "description2", 3, 0), // Shrink PC
 			},
 			{
 				ResourceName:            "google_vmwareengine_private_cloud.vmw-engine-pc",
@@ -68,44 +68,21 @@ func TestAccVmwareenginePrivateCloud_vmwareEnginePrivateCloudUpdate(t *testing.T
 	})
 }
 
-func testPrivateCloudUpdateConfig(context map[string]interface{}, description string, nodeCount int) string {
+func testPrivateCloudUpdateConfig(context map[string]interface{}, description string, nodeCount, deletionDelayHours int) string {
 	context["node_count"] = nodeCount
 	context["description"] = description
+	context["deletion_delay_hours"] = deletionDelayHours
 
 	return acctest.Nprintf(`
-resource "google_project" "project" {
-  project_id      = "tf-test%{random_suffix}"
-  name            = "tf-test%{random_suffix}"
-  org_id          = "%{org_id}"
-  billing_account = "%{billing_account}"
-}
-
-resource "google_project_service" "vmwareengine" {
-  project = google_project.project.project_id
-  service = "vmwareengine.googleapis.com"
-}
-
-resource "time_sleep" "sleep" {
-  create_duration = "1m"
-  depends_on = [
-    google_project_service.vmwareengine,
-  ]
-}
-
 resource "google_vmwareengine_network" "default-nw" {
-  project           = google_project.project.project_id
   name              = "tf-test-pc-nw-%{random_suffix}"
   location          = "global"
   type              = "STANDARD"
   description       = "PC network description."
-  depends_on = [
-    time_sleep.sleep # Sleep allows permissions in the new project to propagate
-  ]
 }
 
 resource "google_vmwareengine_private_cloud" "vmw-engine-pc" {
-  project     = google_project.project.project_id
-  location = "%{region}-a"
+  location = "%{region}-b"
   name = "tf-test-sample-pc%{random_suffix}"
   description = "%{description}"
   type = "TIME_LIMITED"
@@ -121,11 +98,11 @@ resource "google_vmwareengine_private_cloud" "vmw-engine-pc" {
       custom_core_count = 32
     }
   }
+  deletion_delay_hours = "%{deletion_delay_hours}"
 }
 
 data "google_vmwareengine_private_cloud" "ds" {
-	project     = google_project.project.project_id
-	location = "%{region}-a"
+	location = "%{region}-b"
 	name = "tf-test-sample-pc%{random_suffix}"
 	depends_on = [
    	google_vmwareengine_private_cloud.vmw-engine-pc,
