@@ -12,15 +12,15 @@
 # limitations under the License.
 
 --- !ruby/object:Api::Resource
-name: 'EntryGroup'
-base_url: 'projects/{{project}}/locations/{{location}}/entryGroups/{{entry_group_id}}'
-self_link: 'projects/{{project}}/locations/{{location}}/entryGroups/{{entry_group_id}}'
-create_url: 'projects/{{project}}/locations/{{location}}/entryGroups?entryGroupId={{entry_group_id}}'
+name: 'AspectType'
+base_url: 'projects/{{project}}/locations/{{location}}/aspectTypes/{{aspect_type_id}}'
+self_link: 'projects/{{project}}/locations/{{location}}/aspectTypes/{{aspect_type_id}}'
+create_url: 'projects/{{project}}/locations/{{location}}/aspectTypes?aspectTypeId={{aspect_type_id}}'
 update_verb: :PATCH
 update_mask: true
 description: |
-  An Entry Group represents a logical grouping of one or more Entries.
-import_format: ['projects/{{project}}/locations/{{location}}/entryGroups/{{entry_group_id}}']
+ An Aspect Type is a template for creating Aspects.
+import_format: ['projects/{{project}}/locations/{{location}}/aspectTypes/{{aspect_type_id}}']
 async: !ruby/object:Api::OpAsync
   operation: !ruby/object:Api::OpAsync::Operation
     path: 'name'
@@ -46,11 +46,11 @@ iam_policy: !ruby/object:Api::Resource::IamPolicy
   skip_import_test: true
   method_name_separator: ':'
   fetch_iam_policy_verb: :GET
-  parent_resource_attribute: 'entry_group_id'
+  parent_resource_attribute: 'aspect_type_id'
   import_format:
     [
-      'projects/{{project}}/locations/{{location}}/entryGroups/{{entry_group_id}}',
-      '{{entry_group_id}}',
+      'projects/{{project}}/locations/{{location}}/aspectTypes/{{aspect_type_id}}',
+      '{{aspect_type_id}}',
     ]
 parameters:
   - !ruby/object:Api::Type::String
@@ -58,38 +58,38 @@ parameters:
     url_param_only: true
     immutable: true
     description: |
-      The location where entry group will be created in.
+      The location where aspect type will be created in.
   - !ruby/object:Api::Type::String
-    name: 'entryGroupId'
+    name: 'aspectTypeId'
     url_param_only: true
     immutable: true
     description: |
-      The entry group id of the entry group.
+      The aspect type id of the aspect type.
 properties:
   - !ruby/object:Api::Type::String
     name: name
     description: |
-      The relative resource name of the EntryGroup, of the form: projects/{project_number}/locations/{location_id}/entryGroups/{entry_group_id}
+      The relative resource name of the AspectType, of the form: projects/{project_number}/locations/{location_id}/aspectTypes/{aspect_type_id}
     output: true
   - !ruby/object:Api::Type::String
     name: 'uid'
     output: true
     description: |
-      System generated globally unique ID for the EntryGroup. This ID will be different if the EntryGroup is deleted and re-created with the same name.
+      System generated globally unique ID for the AspectType. This ID will be different if the AspectType is deleted and re-created with the same name.
   - !ruby/object:Api::Type::Time
     name: 'createTime'
     output: true
     description: |
-      The time when the EntryGroup was created.
+      The time when the AspectType was created.
   - !ruby/object:Api::Type::Time
     name: 'updateTime'
     output: true
     description: |
-      The time when the EntryGroup was last updated.
+      The time when the AspectType was last updated.
   - !ruby/object:Api::Type::String
     name: 'description'
     description: |
-      Description of the EntryGroup.
+      Description of the AspectType.
   - !ruby/object:Api::Type::String
     name: 'displayName'
     description: |
@@ -97,35 +97,46 @@ properties:
   - !ruby/object:Api::Type::KeyValueLabels
     name: 'labels'
     description: |
-      User-defined labels for the EntryGroup.
+      User-defined labels for the AspectType.
+  - !ruby/object:Api::Type::String
+    name: 'metadataTemplate'
+    description: |
+      MetadataTemplate of the Aspect.
+    custom_expand: 'templates/terraform/custom_expand/json_schema.erb'
+    custom_flatten: 'templates/terraform/custom_flatten/json_schema.erb'
+    state_func:
+      'func(v interface{}) string { s, _ := structure.NormalizeJsonString(v);
+      return s }'
+    validation: !ruby/object:Provider::Terraform::Validation
+      function: 'validation.StringIsJSON'
   - !ruby/object:Api::Type::Enum
     name: 'transferStatus'
     output: true
     description: |
-      Denotes the transfer status of the Entry Group. It is unspecified
-      for Entry Group created from Dataplex API.
+      Denotes the transfer status of the Aspect Type. It is unspecified
+      for Aspect Type created from Dataplex API.
     values:
       - :TRANSFER_STATUS_UNSPECIFIED
       - :TRANSFER_STATUS_MIGRATED
       - :TRANSFER_STATUS_TRANSFERRED
 examples:
   - !ruby/object:Provider::Terraform::Examples
-    name: 'dataplex_entry_group_basic'
-    primary_resource_id: 'test_entry_group_basic'
-    primary_resource_name: "fmt.Sprintf(\"tf-test-entry-group%s\",
+    name: 'dataplex_aspect_type_basic'
+    primary_resource_id: 'test_aspect_type_basic'
+    primary_resource_name: "fmt.Sprintf(\"tf-test-aspect-type%s\",
       context[\"random_suffix\"\
       ])"
     test_env_vars:
       project_name: :PROJECT_NAME
     vars:
-      entry_group_name: entry-group-basic
+      aspect_type_name: aspect-type-basic
   - !ruby/object:Provider::Terraform::Examples
-    name: 'dataplex_entry_group_full'
-    primary_resource_id: 'test_entry_group_full'
-    primary_resource_name: "fmt.Sprintf(\"tf-test-entry-group%s\",
+    name: 'dataplex_aspect_type_full'
+    primary_resource_id: 'test_aspect_type_full'
+    primary_resource_name: "fmt.Sprintf(\"tf-test-aspect-type%s\",
       context[\"random_suffix\"\
       ])"
     test_env_vars:
       project_name: :PROJECT_NAME
     vars:
-      entry_group_name: entry-group-full
+      aspect_type_name: aspect-type-full
