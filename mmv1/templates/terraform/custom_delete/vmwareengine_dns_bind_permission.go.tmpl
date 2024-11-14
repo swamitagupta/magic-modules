@@ -1,0 +1,37 @@
+url, err := tpgresource.ReplaceVars(d, config, "{{"{{"}}VmwareengineBasePath{{"}}"}}projects/{{"{{"}}project{{"}}"}}/locations/global/dnsBindPermission")
+if err != nil {
+    log.Printf("[ERROR] Error replacing vars in URL: %s", err)
+    return err
+}
+log.Printf("[DEBUG] Generated URL: %s", url)
+billingProject := ""
+project, err = tpgresource.GetProject(d, config)
+if err != nil {
+    log.Printf("[ERROR] Error fetching project: %s", err)
+    return fmt.Errorf("Error fetching project for DnsBindPermission: %s", err)
+}
+billingProject = project
+log.Printf("[DEBUG] Fetched project: %s", project)
+// err == nil indicates that the billing_project value was found
+if bp, err := tpgresource.GetBillingProject(d, config); err == nil {
+    log.Printf("[DEBUG] Found billing project: %s", bp)
+    billingProject = bp
+} else {
+    log.Printf("[DEBUG] No billing project found, using project: %s", billingProject)
+}
+principalsProp := d.Get("principals")
+if v, ok := d.GetOkExists("principals"); !tpgresource.IsEmptyValue(reflect.ValueOf(principalsProp)) && (ok || !reflect.DeepEqual(v, principalsProp)) {
+    principals, ok := principalsProp.([]interface{})
+    if !ok {
+        return fmt.Errorf("principalsProp is not a slice of interface{}: %T", principalsProp)
+    }
+    log.Printf("[DEBUG] Revoking principals: %+v", principals)
+    err = revokePrincipals(config, d, url, billingProject, principals, userAgent)
+    if err != nil {
+        log.Printf("[ERROR] Error revoking principals: %s", err)
+        return err
+    }
+}
+d.SetId("")
+log.Printf("[DEBUG] Finished deleting DnsBindPermission %q", d.Id())
+return nil

@@ -1,0 +1,129 @@
+type Principal struct {
+    User           string `json:"user,omitempty"`
+    ServiceAccount string `json:"serviceAccount,omitempty"`
+}
+
+func convertToPrincipal(i interface{}) (Principal, error) {
+	log.Printf("[DEBUG] Converting interface to Principal: %+v", i)
+	var principal Principal
+	m, ok := i.(map[string]interface{})
+	if !ok {
+	    log.Printf("[ERROR] input is not a map[string]interface{}")
+		return principal, fmt.Errorf("input is not a map[string]interface{}")
+	}
+	if serviceAccount, ok := m["service_account"].(string); ok {
+		principal.ServiceAccount = serviceAccount
+	}
+	if user, ok := m["user"].(string); ok {
+		principal.User = user
+	}
+	log.Printf("[DEBUG] Unarshalled principal: %+v", principal)
+	return principal, nil
+}
+
+func grantPrincipals(config *transport_tpg.Config, d *schema.ResourceData, baseUrl, billingProject string, principals []interface{}, userAgent string) error {
+    url := baseUrl + ":grant"
+    for _, principal := range principals {
+        log.Printf("[DEBUG] Granting principal: %+v", principal)
+        requestBody := make(map[string]interface{})
+        principalBody, err := convertToPrincipal(principal)
+        if err != nil {
+            return fmt.Errorf("error granting principal %+v: %s", principal, err)
+        }
+        requestBody["principal"] = principalBody
+        log.Printf("[DEBUG] Request body: %+v", requestBody)
+        headers := make(http.Header)
+        res, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+            Config:    config,
+            Method:    "POST",
+            Project:   billingProject,
+            RawURL:    url,
+            UserAgent: userAgent,
+            Body:      requestBody,
+            Timeout:   d.Timeout(schema.TimeoutCreate),
+            Headers:   headers,
+        })
+        if err != nil {
+            return fmt.Errorf("error granting principal %+v: %s", principal, err)
+        }
+        log.Printf("[DEBUG] Granted principal %+v: %#v", principal, res)
+    }
+    return nil
+}
+
+func revokePrincipals(config *transport_tpg.Config, d *schema.ResourceData, baseUrl, billingProject string, principals []interface{}, userAgent string) error {
+    url := baseUrl + ":revoke"
+    for _, principal := range principals {
+        log.Printf("[DEBUG] Revoking principal: %+v", principal)
+        requestBody := make(map[string]interface{})
+        principalBody, err := convertToPrincipal(principal)
+        if err != nil {
+            return fmt.Errorf("error revoking principal %+v: %s", principal, err)
+        }
+        requestBody["principal"] = principalBody
+        log.Printf("[DEBUG] Request body: %+v", requestBody)
+        headers := make(http.Header)
+        res, err := transport_tpg.SendRequest(transport_tpg.SendRequestOptions{
+            Config:    config,
+            Method:    "POST",
+            Project:   billingProject,
+            RawURL:    url,
+            UserAgent: userAgent,
+            Body:      requestBody,
+            Timeout:   d.Timeout(schema.TimeoutCreate),
+            Headers:   headers,
+        })
+        if err != nil {
+            return fmt.Errorf("error revoking principal %+v: %s", principal, err)
+        }
+        log.Printf("[DEBUG] Revoked principal %+v: %#v", principal, res)
+    }
+    return nil
+}
+
+func getPrincipalsDiff(d *schema.ResourceData) ([]interface{}, []interface{}, error) {
+	log.Printf("[DEBUG] Getting principals diff")
+	old, new := d.GetChange("principals")
+	log.Printf("[DEBUG] Old principals: %+v", old)
+	log.Printf("[DEBUG] New principals: %+v", new)
+	removed := []interface{}{}
+	added := []interface{}{}
+
+	oldMap := make(map[string]bool)
+	oldPrincipals, ok := old.([]interface{})
+	if !ok {
+		return nil, nil, fmt.Errorf("unable to convert old principals to []interface{}")
+	}
+	for _, principal := range oldPrincipals {
+		key := fmt.Sprintf("%v", principal)
+		oldMap[key] = true
+	}
+
+	newMap := make(map[string]bool)
+	newPrincipals, ok := new.([]interface{})
+	if !ok {
+		return nil, nil, fmt.Errorf("unable to convert new principals to []interface{}")
+	}
+	for _, principal := range newPrincipals {
+		key := fmt.Sprintf("%v", principal)
+		newMap[key] = true
+	}
+
+	for _, principal := range oldPrincipals {
+		key := fmt.Sprintf("%v", principal)
+		if _, ok := newMap[key]; !ok {
+			removed = append(removed, principal)
+		}
+	}
+
+	for _, principal := range newPrincipals {
+		key := fmt.Sprintf("%v", principal)
+		if _, ok := oldMap[key]; !ok {
+			added = append(added, principal)
+		}
+	}
+
+	log.Printf("[DEBUG] Added principals: %+v", added)
+	log.Printf("[DEBUG] Removed principals: %+v", removed)
+	return added, removed, nil
+}

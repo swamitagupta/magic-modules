@@ -1,0 +1,5 @@
+resource "google_vmwareengine_dns_bind_permission" "{{$.PrimaryResourceId}}" {
+    principals {
+  	service_account = "{{index $.Vars "service_account"}}"
+  }
+}

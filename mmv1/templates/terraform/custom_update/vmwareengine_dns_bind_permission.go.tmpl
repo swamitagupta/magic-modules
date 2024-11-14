@@ -1,0 +1,37 @@
+userAgent, err := tpgresource.GenerateUserAgentString(d, config.UserAgent)
+if err != nil {
+    log.Printf("[ERROR] Error generating user agent string: %s", err)
+    return err
+}
+url, err := tpgresource.ReplaceVars(d, config, "{{"{{"}}VmwareengineBasePath{{"}}"}}projects/{{"{{"}}project{{"}}"}}/locations/global/dnsBindPermission")
+if err != nil {
+    log.Printf("[ERROR] Error replacing vars in URL: %s", err)
+    return err
+}
+log.Printf("[DEBUG] Generated URL: %s", url)
+billingProject := ""
+project, err = tpgresource.GetProject(d, config)
+if err != nil {
+    log.Printf("[ERROR] Error fetching project: %s", err)
+    return fmt.Errorf("Error fetching project for DnsBindPermission: %s", err)
+}
+billingProject = project
+log.Printf("[DEBUG] Fetched project: %s", project)
+principalsToAdd, principalsToRemove, err := getPrincipalsDiff(d)
+if err != nil {
+    log.Printf("[ERROR] Error getting principals diff: %s", err)
+    return err
+}
+log.Printf("[DEBUG] Principals to add: %+v", principalsToAdd)
+log.Printf("[DEBUG] Principals to remove: %+v", principalsToRemove)
+err = grantPrincipals(config, d, url, billingProject, principalsToAdd, userAgent)
+if err != nil {
+    log.Printf("[ERROR] Error granting principals: %s", err)
+    return err
+}
+err = revokePrincipals(config, d, url, billingProject, principalsToRemove, userAgent)
+if err != nil {
+    log.Printf("[ERROR] Error revoking principals: %s", err)
+    return err
+}
+return resourceVmwareengineDnsBindPermissionRead(d, meta)
